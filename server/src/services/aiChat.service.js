@@ -19,6 +19,8 @@ class AiServiceUnavailableError extends Error {
   }
 }
 
+const hasOnlyAscii = (value) => /^[\x00-\x7F]*$/.test(value);
+
 const getCandidateModels = () => {
   const configuredModel = process.env.GROQ_MODEL?.trim();
   return [...new Set([configuredModel, DEFAULT_GROQ_MODEL, ...FALLBACK_MODELS].filter(Boolean))];
@@ -61,10 +63,20 @@ const createAiReply = async (message) => {
     throw new AiServiceNotConfiguredError();
   }
 
+  if (!hasOnlyAscii(apiKey)) {
+    console.error("GROQ_API_KEY contains non-ASCII characters. Please re-enter the key in Render.");
+    throw new AiServiceNotConfiguredError();
+  }
+
   const models = getCandidateModels();
   let sawAuthError = false;
 
   for (const model of models) {
+    if (!hasOnlyAscii(model)) {
+      console.error(`GROQ_MODEL contains non-ASCII characters: "${model}"`);
+      continue;
+    }
+
     const { response, data, bodyText } = await requestCompletion({ apiKey, model, message });
 
     if (response.ok) {
