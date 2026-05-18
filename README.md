@@ -48,8 +48,11 @@ DATABASE_URL=postgresql://user:password@host/database
 ACCESS_TOKEN_SECRET=your_access_secret
 JWT_EXPIRES_IN=7d
 CLIENT_URL=http://localhost:5173
+AI_PROVIDER=groq
 GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama-3.3-70b-versatile
+OPENROUTER_API_KEY=your_openrouter_api_key
+OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
 ```
 
 Backend будет доступен по адресу:
@@ -192,8 +195,11 @@ Environment Variables:
 - `ACCESS_TOKEN_SECRET`
 - `JWT_EXPIRES_IN`
 - `CLIENT_URL`
+- `AI_PROVIDER`
 - `GROQ_API_KEY`
 - `GROQ_MODEL`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL`
 - `NODE_ENV`
 
 Рекомендуемые значения:
@@ -204,8 +210,11 @@ DATABASE_URL=postgresql://username:password@host/database
 ACCESS_TOKEN_SECRET=long_random_secret
 JWT_EXPIRES_IN=7d
 CLIENT_URL=https://your-frontend-name.vercel.app
+AI_PROVIDER=openrouter
 GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama-3.3-70b-versatile
+OPENROUTER_API_KEY=your_openrouter_api_key
+OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
 NODE_ENV=production
 ```
 

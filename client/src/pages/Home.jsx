@@ -4,9 +4,12 @@ import { ArrowRight, BookOpen, ChartNoAxesCombined, CheckCircle2, GraduationCap,
 import { coursesApi } from "../api/coursesApi";
 import CourseCard from "../components/CourseCard";
 import { SectionTitle } from "../components/ui";
+import { useAuth } from "../context/AuthContext";
 
 export default function Home() {
+  const { user } = useAuth();
   const [courses, setCourses] = useState([]);
+  const startLearningPath = user ? "/my-courses" : "/register";
 
   useEffect(() => {
     coursesApi.getAll().then((response) => setCourses(response.data.slice(0, 3))).catch(() => setCourses([]));
@@ -22,7 +25,7 @@ export default function Home() {
             Курсы, уроки, задания и материалы собраны в единую траекторию. Студент видит прогресс, а ментор управляет программой курса.
           </p>
           <div className="hero__actions">
-            <Link className="button button--large" to="/register">Начать обучение <ArrowRight size={18} /></Link>
+            <Link className="button button--large" to={startLearningPath}>Начать обучение <ArrowRight size={18} /></Link>
             <Link className="button button--large button--glass" to="/courses">Смотреть курсы</Link>
           </div>
         </div>

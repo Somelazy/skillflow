@@ -1,9 +1,51 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, ArrowRight, CheckCircle2, Lock, Unlock } from "lucide-react";
 import { coursesApi } from "../api/coursesApi";
 import { progressApi } from "../api/progressApi";
 import ProgressBar from "../components/ProgressBar";
-import { ErrorMessage, Loader } from "../components/ui";
+import { ErrorMessage } from "../components/ui";
+import LessonAssignments from "../components/lesson/LessonAssignments";
+import LessonMaterial from "../components/lesson/LessonMaterial";
+import LessonResources from "../components/lesson/LessonResources";
+import LessonSkeleton from "../components/lesson/LessonSkeleton";
+
+function isTruthy(value) {
+  return value === true || value === 1 || value === "1" || String(value).toLowerCase() === "true" || String(value).toLowerCase() === "t";
+}
+
+function toRoman(value) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) return value;
+
+  const numerals = [
+    [1000, "M"],
+    [900, "CM"],
+    [500, "D"],
+    [400, "CD"],
+    [100, "C"],
+    [90, "XC"],
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+
+  let remaining = number;
+  let result = "";
+
+  numerals.forEach(([decimal, roman]) => {
+    while (remaining >= decimal) {
+      result += roman;
+      remaining -= decimal;
+    }
+  });
+
+  return result;
+}
 
 export default function LessonPage() {
   const { id } = useParams();
@@ -17,7 +59,29 @@ export default function LessonPage() {
   const [accessDenied, setAccessDenied] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
 
-  const lessons = useMemo(() => course?.modules?.flatMap((module) => module.lessons) || [], [course]);
+  const modules = useMemo(
+    () =>
+      course?.modules?.map((module, moduleIndex) => ({
+        ...module,
+        moduleOrder: module.orderNum ?? moduleIndex + 1,
+        lessons: module.lessons || [],
+      })) || [],
+    [course]
+  );
+
+  const lessons = useMemo(
+    () =>
+      modules.flatMap((module) =>
+        module.lessons.map((moduleLesson, lessonIndex) => ({
+          ...moduleLesson,
+          moduleTitle: module.title,
+          moduleOrder: module.moduleOrder,
+          lessonNumber: lessonIndex + 1,
+        }))
+      ),
+    [modules]
+  );
+
   const lessonFromCourse = lessons.find((item) => String(item.id) === String(id));
   const lesson = lessonDetails || lessonFromCourse;
   const currentIndex = lessons.findIndex((item) => String(item.id) === String(id));
@@ -26,6 +90,11 @@ export default function LessonPage() {
   const completedLessonIds = new Set(
     progress?.lessons?.filter((item) => item.status === "completed").map((item) => item.lessonId) || []
   );
+  const completionPercent = progress?.stats?.completionPercent || 0;
+  const completedLessons = progress?.stats?.completedLessons || 0;
+  const totalLessons = progress?.stats?.totalLessons || lessons.length;
+  const isLessonCompleted = completedLessonIds.has(lesson?.id);
+  const isFreeLesson = isTruthy(lesson?.isFree);
 
   const loadProgress = async () => {
     if (!courseId) return;
@@ -99,72 +168,107 @@ export default function LessonPage() {
     );
   }
 
-  if (error && !course) return <main className="page"><ErrorMessage text={error} /></main>;
-  if (!lesson) return <main className="page"><Loader text="Загружаем урок..." /></main>;
+  if (error && !course) {
+    return (
+      <main className="page">
+        <ErrorMessage text={error} />
+      </main>
+    );
+  }
+
+  if (!lesson) return <LessonSkeleton />;
 
   return (
     <main className="page lesson-layout">
       <article className="lesson-content">
-        <p className="eyebrow">{lesson.contentType}</p>
-        <h1>{lesson.title}</h1>
-        <p className="lead">{lesson.description || "Материал урока доступен ниже."}</p>
-        {lesson.contentUrl && (
-          <a className="button button--ghost" href={lesson.contentUrl} target="_blank" rel="noreferrer">
-            Открыть материал
-          </a>
-        )}
+        <header className="lesson-hero">
+          <div className="lesson-status-row">
+            <span className="lesson-type-badge">{lesson.contentType || "Материал"}</span>
+            <span className={`lesson-access-badge ${isFreeLesson ? "lesson-access-badge--free" : "lesson-access-badge--paid"}`}>
+              {isFreeLesson ? <Unlock size={15} /> : <Lock size={15} />}
+              {isFreeLesson ? "Бесплатный урок" : "Платный урок"}
+            </span>
+          </div>
+          <h1>{lesson.title}</h1>
+          <p className="lead">{lesson.description || "Материал урока доступен ниже."}</p>
+        </header>
 
-        <section>
-          <h2>Ресурсы</h2>
-          {lesson.resources?.length ? lesson.resources.map((resource) => (
-            <a className="resource-line" key={resource.id} href={resource.fileUrl} target="_blank" rel="noreferrer">
-              {resource.fileName}
-            </a>
-          )) : <p className="muted">Для этого урока пока нет дополнительных материалов.</p>}
-        </section>
-
-        <section>
-          <h2>Задания</h2>
-          {lesson.assignments?.length ? lesson.assignments.map((assignment) => (
-            <div className="assignment" key={assignment.id}>
-              <strong>{assignment.type}</strong>
-              <p>{assignment.question}</p>
-            </div>
-          )) : <p className="muted">Задания появятся позже.</p>}
-        </section>
+        <LessonMaterial lesson={lesson} />
+        <LessonResources resources={lesson.resources || []} />
+        <LessonAssignments assignments={lesson.assignments || []} />
 
         {error && <ErrorMessage text={error} />}
         {status && <div className="success">{status}</div>}
 
-        <div className="button-row">
+        <nav className="lesson-actions" aria-label="Навигация по урокам">
           {previousLesson && (
             <Link className="button button--ghost" to={`/lessons/${previousLesson.id}?course=${courseId}`}>
+              <ArrowLeft size={18} />
               Предыдущий урок
             </Link>
           )}
-          <button className="button" onClick={complete} disabled={isCompleting || completedLessonIds.has(lesson.id)}>
-            {completedLessonIds.has(lesson.id) ? "Урок завершён" : isCompleting ? "Сохраняем..." : "Завершить урок"}
+          <button className="button lesson-actions__complete" onClick={complete} disabled={isCompleting || isLessonCompleted}>
+            {isLessonCompleted ? <CheckCircle2 size={18} /> : null}
+            {isLessonCompleted ? "Урок завершён" : isCompleting ? "Сохраняем..." : "Завершить урок"}
           </button>
           {nextLesson && (
             <Link className="button button--dark" to={`/lessons/${nextLesson.id}?course=${courseId}`}>
               Следующий урок
+              <ArrowRight size={18} />
             </Link>
           )}
-        </div>
+        </nav>
       </article>
 
       <aside className="lesson-sidebar">
-        <ProgressBar value={progress?.stats?.completionPercent || 0} />
-        <Link to={`/learn/${courseId}`}>Вернуться к курсу</Link>
-        {lessons.map((item) => (
-          <Link
-            key={item.id}
-            className={`${String(item.id) === String(id) ? "active" : ""} ${completedLessonIds.has(item.id) ? "completed" : ""}`.trim()}
-            to={`/lessons/${item.id}?course=${courseId}`}
-          >
-            {item.title}
-          </Link>
-        ))}
+        <div className="lesson-progress-card">
+          <div className="lesson-progress-card__head">
+            <span>Прогресс курса</span>
+            <strong>{completionPercent}%</strong>
+          </div>
+          <ProgressBar value={completionPercent} />
+          <p>Пройдено {completedLessons} из {totalLessons} уроков</p>
+        </div>
+
+        <Link className="lesson-back-link" to={`/learn/${courseId}`}>
+          <ArrowLeft size={16} />
+          Вернуться к курсу
+        </Link>
+
+        <div className="lesson-nav-list">
+          <h2>Уроки курса</h2>
+          {modules.map((module) => (
+            <section className="lesson-module-group" key={module.id || `${module.moduleOrder}-${module.title}`}>
+              <h3 className="lesson-module-title">
+                <span>{toRoman(module.moduleOrder)}</span>
+                {module.title}
+              </h3>
+
+              {module.lessons.map((item, lessonIndex) => {
+                const active = String(item.id) === String(id);
+                const completed = completedLessonIds.has(item.id);
+                const globalIndex = lessons.findIndex((lessonItem) => String(lessonItem.id) === String(item.id));
+
+                return (
+                  <Link
+                    key={item.id}
+                    className={`${active ? "active" : ""} ${completed ? "completed" : ""}`.trim()}
+                    to={`/lessons/${item.id}?course=${courseId}`}
+                    title={item.title}
+                  >
+                    <span>{completed ? <CheckCircle2 size={16} /> : globalIndex + 1 || lessonIndex + 1}</span>
+                    <div>
+                      <small>
+                        {isTruthy(item.isFree) ? "Бесплатный" : "Платный"} урок
+                      </small>
+                      <strong>{item.title}</strong>
+                    </div>
+                  </Link>
+                );
+              })}
+            </section>
+          ))}
+        </div>
       </aside>
     </main>
   );

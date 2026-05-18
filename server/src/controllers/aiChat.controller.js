@@ -4,15 +4,26 @@ const {
   AiServiceUnavailableError,
 } = require("../services/aiChat.service");
 
-const sendMessage = async (req, res) => {
-  const { message } = req.body;
+const MAX_MESSAGE_LENGTH = 2000;
 
-  if (!message || !String(message).trim()) {
+const sendMessage = async (req, res) => {
+  const { message, history, context } = req.body;
+  const normalizedMessage = String(message || "").trim();
+
+  if (!normalizedMessage) {
     return res.status(400).json({ error: "Message is required" });
   }
 
+  if (normalizedMessage.length > MAX_MESSAGE_LENGTH) {
+    return res.status(400).json({ error: "Message is too long" });
+  }
+
   try {
-    const reply = await createAiReply(message);
+    const reply = await createAiReply({
+      message: normalizedMessage,
+      history,
+      context,
+    });
     res.json({ reply });
   } catch (error) {
     if (error instanceof AiServiceNotConfiguredError) {

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { GraduationCap } from "lucide-react";
 
 export default function Register() {
-  const { register } = useAuth();
+  const { register, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ Email: "", Login: "", Password_hash: "", First_name: "", Last_name: "" });
   const [error, setError] = useState("");
@@ -23,6 +23,10 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  if (!authLoading && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <main className="auth-page">
