@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, MessageCircle, RotateCcw, Send, Sparkles, Trash2, X } from "lucide-react";
+import { Bot, Check, Clipboard, MessageCircle, RotateCcw, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useLocation, useParams } from "react-router-dom";
 import { aiChatApi } from "../api/aiChatApi";
 
@@ -24,7 +24,7 @@ const quickPrompts = [
 
 const getFriendlyErrorMessage = (error) => {
   if (error.message === "AI service is not configured") {
-    return "ИИ-ассистент ещё не настроен. Проверьте ключ Groq на backend.";
+    return "ИИ-ассистент ещё не настроен. Проверьте ключ AI-провайдера на backend.";
   }
 
   if (error.message === "AI assistant is temporarily unavailable") {
@@ -74,43 +74,104 @@ const normalizeForHistory = (messages) =>
       content: item.text,
     }));
 
-const parseMessageParts = (text) => {
+const parseMessageParts = (text = "") => {
   const parts = [];
-  const pattern = /```([\s\S]*?)```/g;
+  const pattern = /```([a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g;
   let lastIndex = 0;
   let match;
 
   while ((match = pattern.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push({ type: "text", value: text.slice(lastIndex, match.index) });
+      parts.push({ type: "text", content: text.slice(lastIndex, match.index) });
     }
 
-    parts.push({ type: "code", value: match[1].replace(/^\w+\n/, "").trim() });
+    parts.push({
+      type: "code",
+      language: match[1]?.trim() || "text",
+      content: match[2].replace(/\n$/, ""),
+    });
     lastIndex = pattern.lastIndex;
   }
 
   if (lastIndex < text.length) {
-    parts.push({ type: "text", value: text.slice(lastIndex) });
+    parts.push({ type: "text", content: text.slice(lastIndex) });
   }
 
-  return parts.length ? parts : [{ type: "text", value: text }];
+  return parts.length ? parts : [{ type: "text", content: text }];
 };
+
+const parseInlineCode = (text = "") =>
+  text.split(/(`[^`]+`)/g).filter(Boolean).map((chunk, index) => {
+    if (chunk.startsWith("`") && chunk.endsWith("`")) {
+      return (
+        <code className="ai-chat__inline-code" key={`inline-${index}`}>
+          {chunk.slice(1, -1)}
+        </code>
+      );
+    }
+
+    return <React.Fragment key={`text-${index}`}>{chunk}</React.Fragment>;
+  });
+
+const copyText = async (text) => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+};
+
+function CodeBlock({ language = "text", code }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await copyText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="ai-chat__code-block">
+      <div className="ai-chat__code-header">
+        <span className="ai-chat__code-lang">{language}</span>
+        <button className="ai-chat__copy-code" type="button" onClick={handleCopy}>
+          {copied ? <Check size={14} /> : <Clipboard size={14} />}
+          {copied ? "Скопировано" : "Копировать"}
+        </button>
+      </div>
+      <pre className="ai-chat__code-pre">
+        <code className="ai-chat__code-code">{code}</code>
+      </pre>
+    </div>
+  );
+}
 
 function MessageContent({ text }) {
   return (
-    <>
+    <div className="ai-chat__message-content">
       {parseMessageParts(text).map((part, index) =>
         part.type === "code" ? (
-          <pre className="ai-chat__code" key={`${part.type}-${index}`}>
-            <code>{part.value}</code>
-          </pre>
+          <CodeBlock code={part.content} language={part.language} key={`code-${index}`} />
         ) : (
-          <span className="ai-chat__text" key={`${part.type}-${index}`}>
-            {part.value}
+          <span className="ai-chat__text" key={`text-${index}`}>
+            {parseInlineCode(part.content)}
           </span>
         )
       )}
-    </>
+    </div>
   );
 }
 

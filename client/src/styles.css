@@ -1180,7 +1180,6 @@ textarea { min-height: 120px; resize: vertical; }
   border-radius: 16px;
   line-height: 1.48;
   font-size: 14px;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .ai-chat__message--assistant {
@@ -1205,16 +1204,77 @@ textarea { min-height: 120px; resize: vertical; }
   font-weight: 800;
   opacity: .58;
 }
-.ai-chat__text { white-space: pre-wrap; }
-.ai-chat__code {
+.ai-chat__message-content {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.ai-chat__text {
+  white-space: pre-wrap;
+  min-width: 0;
+}
+.ai-chat__inline-code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: inherit;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: .92em;
+  font-weight: 800;
+}
+.ai-chat__code-block {
   max-width: 100%;
-  overflow-x: auto;
-  margin: 4px 0;
-  padding: 12px;
-  border-radius: 10px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: 16px;
   background: #0f172a;
   color: #e2e8f0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+.ai-chat__code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, .18);
+  background: rgba(15, 23, 42, .72);
+}
+.ai-chat__code-lang {
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .04em;
+  text-transform: lowercase;
+}
+.ai-chat__copy-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: 9px;
+  background: rgba(255,255,255,.06);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+}
+.ai-chat__copy-code:hover {
+  background: rgba(255,255,255,.12);
+}
+.ai-chat__code-pre {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0;
+  padding: 14px;
+  background: transparent;
+}
+.ai-chat__code-code {
+  font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", monospace;
   font-size: 13px;
+  line-height: 1.6;
   white-space: pre;
 }
 .ai-chat__retry {
@@ -1366,7 +1426,7 @@ textarea { min-height: 120px; resize: vertical; }
   background: color-mix(in srgb, var(--danger) 12%, var(--panel));
 }
 
-:root[data-theme="dark"] .ai-chat__code {
+:root[data-theme="dark"] .ai-chat__code-block {
   background: #020617;
 }
 
