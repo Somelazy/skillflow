@@ -5,14 +5,20 @@ const API_URL = RAW_API_URL.replace(/\/$/, "").endsWith("/api")
 
 export async function apiRequest(path, options = {}) {
   const token = localStorage.getItem("skillflow_token");
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new Error("Не удалось подключиться к серверу. Проверьте backend URL и CORS.");
+  }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {

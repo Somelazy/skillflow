@@ -48,8 +48,15 @@ const generalApiLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
+const normalizeOrigin = (value) => String(value || "").replace(/\/$/, "");
+
+const configuredClientOrigins = String(process.env.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => normalizeOrigin(origin.trim()))
+  .filter(Boolean);
+
 const allowedOrigins = [
-  process.env.CLIENT_URL,
+  ...configuredClientOrigins,
   process.env.NODE_ENV !== "production" ? "http://localhost:5173" : null,
   process.env.NODE_ENV !== "production" ? "http://127.0.0.1:5173" : null,
 ].filter(Boolean);
@@ -57,7 +64,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
         return callback(null, true);
       }
 
