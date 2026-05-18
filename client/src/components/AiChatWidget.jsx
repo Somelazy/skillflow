@@ -4,9 +4,17 @@ import { useLocation, useParams } from "react-router-dom";
 import { aiChatApi } from "../api/aiChatApi";
 
 const STORAGE_KEY = "skillflow_ai_chat_history";
+const SIZE_STORAGE_KEY = "skillflow_ai_chat_size";
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_STORED_MESSAGES = 30;
 const HISTORY_CONTEXT_LIMIT = 10;
+const DEFAULT_CHAT_SIZE = { width: 430, height: 620 };
+const CHAT_SIZE_LIMITS = {
+  minWidth: 340,
+  maxWidth: 760,
+  minHeight: 420,
+  maxHeight: 820,
+};
 
 const welcomeMessage = {
   id: "welcome",
@@ -51,6 +59,38 @@ const formatTime = (dateValue) =>
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(dateValue || Date.now()));
+
+const clampValue = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const getIsCompactChat = () =>
+  typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
+
+const clampChatSize = (size = DEFAULT_CHAT_SIZE) => {
+  if (typeof window === "undefined") {
+    return DEFAULT_CHAT_SIZE;
+  }
+
+  const maxWidth = Math.max(CHAT_SIZE_LIMITS.minWidth, Math.min(CHAT_SIZE_LIMITS.maxWidth, window.innerWidth - 32));
+  const maxHeight = Math.max(CHAT_SIZE_LIMITS.minHeight, Math.min(CHAT_SIZE_LIMITS.maxHeight, window.innerHeight - 110));
+
+  return {
+    width: clampValue(Number(size.width) || DEFAULT_CHAT_SIZE.width, CHAT_SIZE_LIMITS.minWidth, maxWidth),
+    height: clampValue(Number(size.height) || DEFAULT_CHAT_SIZE.height, CHAT_SIZE_LIMITS.minHeight, maxHeight),
+  };
+};
+
+const getInitialChatSize = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SIZE_STORAGE_KEY) || "null");
+    if (saved?.width && saved?.height) {
+      return clampChatSize(saved);
+    }
+  } catch {
+    localStorage.removeItem(SIZE_STORAGE_KEY);
+  }
+
+  return clampChatSize(DEFAULT_CHAT_SIZE);
+};
 
 const getInitialMessages = () => {
   try {
@@ -182,8 +222,11 @@ export default function AiChatWidget() {
   const [messages, setMessages] = useState(getInitialMessages);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [chatSize, setChatSize] = useState(getInitialChatSize);
+  const [isCompactChat, setIsCompactChat] = useState(getIsCompactChat);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const resizeStateRef = useRef(null);
 
   const pageContext = useMemo(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -202,6 +245,27 @@ export default function AiChatWidget() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)));
   }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem(SIZE_STORAGE_KEY, JSON.stringify(chatSize));
+  }, [chatSize]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 720px)");
+    const updateCompactMode = () => {
+      setIsCompactChat(mediaQuery.matches);
+      setChatSize((current) => clampChatSize(current));
+    };
+
+    updateCompactMode();
+    mediaQuery.addEventListener?.("change", updateCompactMode);
+    mediaQuery.addListener?.(updateCompactMode);
+
+    return () => {
+      mediaQuery.removeEventListener?.("change", updateCompactMode);
+      mediaQuery.removeListener?.(updateCompactMode);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -293,10 +357,59 @@ export default function AiChatWidget() {
     setMessage(event.target.value.slice(0, MAX_MESSAGE_LENGTH));
   };
 
+  const handleChatResize = (event) => {
+    if (!resizeStateRef.current) return;
+
+    const nextSize = clampChatSize({
+      width: resizeStateRef.current.width - (event.clientX - resizeStateRef.current.x),
+      height: resizeStateRef.current.height - (event.clientY - resizeStateRef.current.y),
+    });
+
+    setChatSize(nextSize);
+  };
+
+  const stopChatResize = () => {
+    resizeStateRef.current = null;
+    document.body.classList.remove("ai-chat-resizing");
+    window.removeEventListener("pointermove", handleChatResize);
+    window.removeEventListener("pointerup", stopChatResize);
+  };
+
+  const startChatResize = (event) => {
+    if (isCompactChat || event.button !== 0) return;
+
+    event.preventDefault();
+    resizeStateRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      width: chatSize.width,
+      height: chatSize.height,
+    };
+    document.body.classList.add("ai-chat-resizing");
+    window.addEventListener("pointermove", handleChatResize);
+    window.addEventListener("pointerup", stopChatResize, { once: true });
+  };
+
+  const resetChatSize = () => {
+    setChatSize(clampChatSize(DEFAULT_CHAT_SIZE));
+  };
+
   return (
     <div className="ai-chat">
       {isOpen && (
-        <section className="ai-chat__panel" aria-label="AI chat">
+        <section className="ai-chat__panel" aria-label="AI chat" style={isCompactChat ? undefined : chatSize}>
+          <button
+            aria-label="Изменить размер окна чата"
+            className="ai-chat__resize-handle"
+            onDoubleClick={resetChatSize}
+            onPointerDown={startChatResize}
+            title="Потяните, чтобы изменить размер. Двойной клик сбросит размер."
+            type="button"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
           <header className="ai-chat__header">
             <div className="ai-chat__title">
               <span className="ai-chat__bot">
