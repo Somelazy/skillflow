@@ -52,7 +52,7 @@ AI_PROVIDER=groq
 GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama-3.3-70b-versatile
 OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
+OPENROUTER_MODEL=openrouter/free
 ```
 
 Backend будет доступен по адресу:
@@ -214,7 +214,7 @@ AI_PROVIDER=openrouter
 GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama-3.3-70b-versatile
 OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
+OPENROUTER_MODEL=openrouter/free
 NODE_ENV=production
 ```
 

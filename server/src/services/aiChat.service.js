@@ -11,8 +11,9 @@ const PROVIDERS = {
     apiUrl: "https://openrouter.ai/api/v1/chat/completions",
     apiKeyEnv: "OPENROUTER_API_KEY",
     modelEnv: "OPENROUTER_MODEL",
-    defaultModel: "deepseek/deepseek-chat-v3-0324:free",
+    defaultModel: "openrouter/free",
     fallbackModels: [
+      "openrouter/free",
       "deepseek/deepseek-chat-v3-0324:free",
       "meta-llama/llama-3.1-8b-instruct:free",
     ],
