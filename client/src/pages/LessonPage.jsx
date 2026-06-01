@@ -10,6 +10,12 @@ import LessonMaterial from "../components/lesson/LessonMaterial";
 import LessonResources from "../components/lesson/LessonResources";
 import LessonSkeleton from "../components/lesson/LessonSkeleton";
 
+const statusLabels = {
+  not_started: "Не начат",
+  in_progress: "В процессе",
+  completed: "Завершён",
+};
+
 function isTruthy(value) {
   return value === true || value === 1 || value === "1" || String(value).toLowerCase() === "true" || String(value).toLowerCase() === "t";
 }
@@ -47,16 +53,27 @@ function toRoman(value) {
   return result;
 }
 
+function getFriendlyError(error) {
+  if (error.message === "You do not have access to this lesson") return "access_denied";
+  if (error.message === "Урок не найден") return "lesson_not_found";
+  if (error.message === "Курс не найден") return "course_not_found";
+  return "common";
+}
+
 export default function LessonPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const courseId = searchParams.get("course");
+  const queryCourseId = searchParams.get("course");
+  const [courseId, setCourseId] = useState(queryCourseId || "");
   const [course, setCourse] = useState(null);
   const [progress, setProgress] = useState(null);
   const [lessonDetails, setLessonDetails] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
+  const [lessonNotFound, setLessonNotFound] = useState(false);
+  const [courseNotFound, setCourseNotFound] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
 
   const modules = useMemo(
@@ -88,54 +105,98 @@ export default function LessonPage() {
   const previousLesson = lessons[currentIndex - 1];
   const nextLesson = lessons[currentIndex + 1];
   const completedLessonIds = new Set(
-    progress?.lessons?.filter((item) => item.status === "completed").map((item) => item.lessonId) || []
+    progress?.lessons?.filter((item) => item.status === "completed").map((item) => String(item.lessonId)) || []
   );
+  const progressByLesson = new Map((progress?.lessons || []).map((item) => [String(item.lessonId), item]));
+  const currentProgress = progressByLesson.get(String(id)) || progressByLesson.get(String(lesson?.id));
   const completionPercent = progress?.stats?.completionPercent || 0;
   const completedLessons = progress?.stats?.completedLessons || 0;
   const totalLessons = progress?.stats?.totalLessons || lessons.length;
-  const isLessonCompleted = completedLessonIds.has(lesson?.id);
+  const isLessonCompleted = completedLessonIds.has(String(lesson?.id));
+  const lessonStatus = currentProgress?.status || (isLessonCompleted ? "completed" : "not_started");
   const isFreeLesson = isTruthy(lesson?.isFree);
 
-  const loadProgress = async () => {
-    if (!courseId) return;
-    const response = await progressApi.getCourse(courseId);
+  const loadProgress = async (targetCourseId = courseId) => {
+    if (!targetCourseId) return;
+    const response = await progressApi.getCourse(targetCourseId);
     setProgress(response.data);
   };
 
   useEffect(() => {
-    if (!courseId) {
-      setError("Не удалось определить курс для этого урока.");
-      return;
-    }
+    let isMounted = true;
+    const loadLesson = async () => {
+      setIsLoading(true);
+      setCourseId(queryCourseId || "");
+      setCourse(null);
+      setProgress(null);
+      setLessonDetails(null);
+      setLessonNotFound(false);
+      setCourseNotFound(false);
+      setAccessDenied(false);
+      setStatus("");
+      setError("");
 
-    setStatus("");
-    setError("");
-    setAccessDenied(false);
-    setLessonDetails(null);
+      try {
+        const lessonResponse = await coursesApi.getLesson(id);
+        const loadedLesson = lessonResponse.data;
+        const nextCourseId = queryCourseId || loadedLesson.courseId;
 
-    Promise.all([
-      coursesApi.getById(courseId),
-      progressApi.getCourse(courseId),
-      coursesApi.getLesson(id),
-    ])
-      .then(async ([courseResponse, progressResponse, lessonResponse]) => {
-        setCourse(courseResponse.data);
-        setProgress(progressResponse.data);
-        setLessonDetails(lessonResponse.data);
-        await progressApi.startLesson(id).catch(() => null);
-      })
-      .catch((requestError) => {
-        if (requestError.message === "You do not have access to this lesson") {
-          setAccessDenied(true);
-          setError("Этот урок доступен после покупки курса.");
-          return;
+        if (!nextCourseId) {
+          throw new Error("Не удалось определить курс для этого урока.");
         }
 
-        setError("Произошла ошибка. Попробуйте позже.");
-      });
-  }, [courseId, id]);
+        const [courseResponse, progressResponse] = await Promise.all([
+          coursesApi.getById(nextCourseId),
+          progressApi.getCourse(nextCourseId),
+        ]);
+
+        if (!isMounted) return;
+
+        setCourseId(String(nextCourseId));
+        setCourse(courseResponse.data);
+        setProgress(progressResponse.data);
+        setLessonDetails(loadedLesson);
+
+        const existingProgress = progressResponse.data?.lessons?.find((item) => String(item.lessonId) === String(id));
+        if (existingProgress?.status !== "completed") {
+          await progressApi.startLesson(id).catch(() => null);
+          const updatedProgressResponse = await progressApi.getCourse(nextCourseId).catch(() => null);
+          if (isMounted && updatedProgressResponse?.data) {
+            setProgress(updatedProgressResponse.data);
+          }
+        }
+      } catch (requestError) {
+        if (!isMounted) return;
+
+        const errorKind = getFriendlyError(requestError);
+
+        if (errorKind === "access_denied") {
+          setAccessDenied(true);
+          setError("Этот урок доступен после покупки курса.");
+        } else if (errorKind === "lesson_not_found") {
+          setLessonNotFound(true);
+          setError("Урок не найден");
+        } else if (errorKind === "course_not_found") {
+          setCourseNotFound(true);
+          setError("Курс не найден");
+        } else {
+          setError(requestError.message === "Не удалось определить курс для этого урока." ? requestError.message : "Произошла ошибка. Попробуйте позже.");
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadLesson();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [queryCourseId, id]);
 
   const complete = async () => {
+    if (isLessonCompleted) return;
+
     setError("");
     setStatus("");
     setIsCompleting(true);
@@ -145,17 +206,30 @@ export default function LessonPage() {
       await loadProgress();
       setStatus("Урок завершён. Прогресс сохранён.");
     } catch (requestError) {
-      if (requestError.message === "You do not have access to this lesson") {
+      const errorKind = getFriendlyError(requestError);
+
+      if (errorKind === "access_denied") {
         setAccessDenied(true);
         setError("Этот урок доступен после покупки курса.");
         return;
       }
 
-      setError("Не удалось завершить урок. Проверьте авторизацию и попробуйте ещё раз.");
+      setError(errorKind === "lesson_not_found" ? "Урок не найден" : "Не удалось завершить урок. Проверьте авторизацию и попробуйте ещё раз.");
     } finally {
       setIsCompleting(false);
     }
   };
+
+  if (lessonNotFound || courseNotFound) {
+    return (
+      <main className="page">
+        <ErrorMessage text={lessonNotFound ? "Урок не найден" : "Курс не найден"} />
+        <Link className="button button--ghost" to="/courses">
+          Вернуться к курсам
+        </Link>
+      </main>
+    );
+  }
 
   if (accessDenied) {
     return (
@@ -176,17 +250,27 @@ export default function LessonPage() {
     );
   }
 
-  if (!lesson) return <LessonSkeleton />;
+  if (isLoading || !lesson) return <LessonSkeleton />;
 
   return (
-    <main className="page lesson-layout">
-      <article className="lesson-content">
+    <main className="page lesson-page">
+      <nav className="breadcrumbs" aria-label="Навигация">
+        <Link to="/courses">Курсы</Link>
+        {course ? <Link to={`/courses/${course.id}`}>{course.title}</Link> : <span>Курс</span>}
+        <span>{lesson.title}</span>
+      </nav>
+
+      <div className="lesson-layout">
+        <article className="lesson-content">
         <header className="lesson-hero">
           <div className="lesson-status-row">
             <span className="lesson-type-badge">{lesson.contentType || "Материал"}</span>
             <span className={`lesson-access-badge ${isFreeLesson ? "lesson-access-badge--free" : "lesson-access-badge--paid"}`}>
               {isFreeLesson ? <Unlock size={15} /> : <Lock size={15} />}
               {isFreeLesson ? "Бесплатный урок" : "Платный урок"}
+            </span>
+            <span className={`lesson-status lesson-status--${lessonStatus}`}>
+              {statusLabels[lessonStatus]}
             </span>
           </div>
           <h1>{lesson.title}</h1>
@@ -201,21 +285,43 @@ export default function LessonPage() {
         {status && <div className="success">{status}</div>}
 
         <nav className="lesson-actions" aria-label="Навигация по урокам">
-          {previousLesson && (
-            <Link className="button button--ghost" to={`/lessons/${previousLesson.id}?course=${courseId}`}>
+          {previousLesson ? (
+            <Link className="button button--ghost lesson-action lesson-action--stacked" to={`/lessons/${previousLesson.id}?course=${courseId}`}>
               <ArrowLeft size={18} />
-              Предыдущий урок
+              <span>
+                <small>Предыдущий урок</small>
+                {previousLesson.title}
+              </span>
             </Link>
+          ) : (
+            <span className="button button--ghost lesson-action lesson-action--stacked lesson-action--disabled" aria-disabled="true">
+              <ArrowLeft size={18} />
+              <span>
+                <small>Предыдущий урок</small>
+                Нет предыдущего урока
+              </span>
+            </span>
           )}
-          <button className="button lesson-actions__complete" onClick={complete} disabled={isCompleting || isLessonCompleted}>
+          <button className="button lesson-action lesson-actions__complete" onClick={complete} disabled={isCompleting || isLessonCompleted}>
             {isLessonCompleted ? <CheckCircle2 size={18} /> : null}
             {isLessonCompleted ? "Урок завершён" : isCompleting ? "Сохраняем..." : "Завершить урок"}
           </button>
-          {nextLesson && (
-            <Link className="button button--dark" to={`/lessons/${nextLesson.id}?course=${courseId}`}>
-              Следующий урок
+          {nextLesson ? (
+            <Link className="button button--dark lesson-action lesson-action--stacked" to={`/lessons/${nextLesson.id}?course=${courseId}`}>
+              <span>
+                <small>Следующий урок</small>
+                {nextLesson.title}
+              </span>
               <ArrowRight size={18} />
             </Link>
+          ) : (
+            <span className="button button--dark lesson-action lesson-action--stacked lesson-action--disabled" aria-disabled="true">
+              <span>
+                <small>Следующий урок</small>
+                Это последний урок
+              </span>
+              <ArrowRight size={18} />
+            </span>
           )}
         </nav>
       </article>
@@ -246,21 +352,20 @@ export default function LessonPage() {
 
               {module.lessons.map((item, lessonIndex) => {
                 const active = String(item.id) === String(id);
-                const completed = completedLessonIds.has(item.id);
+                const itemStatus = progressByLesson.get(String(item.id))?.status || "not_started";
+                const completed = itemStatus === "completed";
                 const globalIndex = lessons.findIndex((lessonItem) => String(lessonItem.id) === String(item.id));
 
                 return (
                   <Link
                     key={item.id}
-                    className={`${active ? "active" : ""} ${completed ? "completed" : ""}`.trim()}
+                    className={`${active ? "active" : ""} ${completed ? "completed" : ""} ${itemStatus === "in_progress" ? "in-progress" : ""}`.trim()}
                     to={`/lessons/${item.id}?course=${courseId}`}
                     title={item.title}
                   >
                     <span>{completed ? <CheckCircle2 size={16} /> : globalIndex + 1 || lessonIndex + 1}</span>
                     <div>
-                      <small>
-                        {isTruthy(item.isFree) ? "Бесплатный" : "Платный"} урок
-                      </small>
+                      <small>{statusLabels[itemStatus]} · {isTruthy(item.isFree) ? "бесплатный" : "платный"}</small>
                       <strong>{item.title}</strong>
                     </div>
                   </Link>
@@ -270,6 +375,7 @@ export default function LessonPage() {
           ))}
         </div>
       </aside>
+      </div>
     </main>
   );
 }

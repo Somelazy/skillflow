@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Save, Trash2 } from "lucide-react";
 import { coursesApi } from "../api/coursesApi";
 import { EmptyState, ErrorMessage, Loader, PageHeader } from "../components/ui";
 
@@ -37,6 +37,26 @@ function Field({ label, children }) {
   );
 }
 
+function AdminSection({ id, title, open, onToggle, children }) {
+  return (
+    <section className="admin-accordion" data-open={open ? "true" : "false"}>
+      <button
+        aria-controls={`admin-section-${id}`}
+        aria-expanded={open}
+        className="admin-accordion__summary"
+        onClick={() => onToggle(id)}
+        type="button"
+      >
+        <span>{title}</span>
+        <ChevronDown size={18} />
+      </button>
+      <div className="admin-accordion__content" id={`admin-section-${id}`}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
 const toCourseForm = (course) => ({
   Title: course.title || "",
   Description: course.description || "",
@@ -61,11 +81,26 @@ export default function AdminCourseForm() {
   const [lessonForm, setLessonForm] = useState(emptyLesson);
   const [assignmentForm, setAssignmentForm] = useState(emptyAssignment);
   const [resourceForm, setResourceForm] = useState(emptyResource);
+  const [openAdminSections, setOpenAdminSections] = useState({
+    info: true,
+    modules: false,
+    lessons: false,
+    assignments: false,
+    resources: false,
+    structure: false,
+  });
 
   const lessons = useMemo(
     () => course?.modules?.flatMap((module) => module.lessons.map((lesson) => ({ ...lesson, moduleTitle: module.title }))) || [],
     [course]
   );
+
+  const toggleAdminSection = (sectionId) => {
+    setOpenAdminSections((current) => ({
+      ...current,
+      [sectionId]: !current[sectionId],
+    }));
+  };
 
   const load = async () => {
     if (isNew) return;
@@ -237,76 +272,87 @@ export default function AdminCourseForm() {
       {error && <ErrorMessage text={error} />}
       {success && <div className="success">{success}</div>}
 
-      <form className="form-card wide admin-course-main" onSubmit={saveCourse}>
-        <h2>Основная информация</h2>
-        <input placeholder="Название курса" value={form.Title} onChange={(e) => setForm({ ...form, Title: e.target.value })} />
-        <textarea placeholder="Описание курса" value={form.Description} onChange={(e) => setForm({ ...form, Description: e.target.value })} />
-        <div className="form-grid">
-          <input placeholder="Цена" value={form.Price} onChange={(e) => setForm({ ...form, Price: e.target.value })} />
-          <input placeholder="Тип курса" value={form.Course_type} onChange={(e) => setForm({ ...form, Course_type: e.target.value })} />
-          <input placeholder="Сложность" value={form.Difficulty_level} onChange={(e) => setForm({ ...form, Difficulty_level: e.target.value })} />
-          <input placeholder="Длительность, часы" type="number" value={form.Duration_hours} onChange={(e) => setForm({ ...form, Duration_hours: Number(e.target.value) })} />
-        </div>
-        <label className="checkbox-line">
-          <input type="checkbox" checked={form.Is_active} onChange={(e) => setForm({ ...form, Is_active: e.target.checked })} />
-          Курс активен
-        </label>
-        <button className="button" disabled={saving}><Save size={18} /> {saving ? "Сохраняем..." : "Сохранить курс"}</button>
-      </form>
+      <AdminSection id="info" title="Основная информация курса" open={openAdminSections.info} onToggle={toggleAdminSection}>
+        <form className="form-card wide admin-course-main" onSubmit={saveCourse}>
+          <h2>Основная информация</h2>
+          <input placeholder="Название курса" value={form.Title} onChange={(e) => setForm({ ...form, Title: e.target.value })} />
+          <textarea placeholder="Описание курса" value={form.Description} onChange={(e) => setForm({ ...form, Description: e.target.value })} />
+          <div className="form-grid">
+            <input placeholder="Цена" value={form.Price} onChange={(e) => setForm({ ...form, Price: e.target.value })} />
+            <input placeholder="Тип курса" value={form.Course_type} onChange={(e) => setForm({ ...form, Course_type: e.target.value })} />
+            <input placeholder="Сложность" value={form.Difficulty_level} onChange={(e) => setForm({ ...form, Difficulty_level: e.target.value })} />
+            <input placeholder="Длительность, часы" type="number" value={form.Duration_hours} onChange={(e) => setForm({ ...form, Duration_hours: Number(e.target.value) })} />
+          </div>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={form.Is_active} onChange={(e) => setForm({ ...form, Is_active: e.target.checked })} />
+            Курс активен
+          </label>
+          <button className="button admin-action" disabled={saving}><Save size={18} /> {saving ? "Сохраняем..." : "Сохранить курс"}</button>
+        </form>
+      </AdminSection>
 
       {!isNew && (
         <>
           <section className="admin-panels">
-            <form className="mini-form" onSubmit={createModule}>
-              <h2>Добавить модуль</h2>
-              <input placeholder="Название" value={moduleForm.Title} onChange={(e) => setModuleForm({ ...moduleForm, Title: e.target.value })} />
-              <input placeholder="Описание" value={moduleForm.Description} onChange={(e) => setModuleForm({ ...moduleForm, Description: e.target.value })} />
-              <input type="number" value={moduleForm.Order_Num} onChange={(e) => setModuleForm({ ...moduleForm, Order_Num: Number(e.target.value) })} />
-              <button className="button"><Plus size={18} /> Добавить модуль</button>
-            </form>
+            <AdminSection id="modules" title="Модули" open={openAdminSections.modules} onToggle={toggleAdminSection}>
+              <form className="mini-form" onSubmit={createModule}>
+                <h2>Добавить модуль</h2>
+                <input placeholder="Название" value={moduleForm.Title} onChange={(e) => setModuleForm({ ...moduleForm, Title: e.target.value })} />
+                <input placeholder="Описание" value={moduleForm.Description} onChange={(e) => setModuleForm({ ...moduleForm, Description: e.target.value })} />
+                <input type="number" value={moduleForm.Order_Num} onChange={(e) => setModuleForm({ ...moduleForm, Order_Num: Number(e.target.value) })} />
+                <button className="button admin-action"><Plus size={18} /> Добавить модуль</button>
+              </form>
+            </AdminSection>
 
-            <form className="mini-form" onSubmit={createLesson}>
-              <h2>Добавить урок</h2>
-              <select value={lessonForm.moduleId} onChange={(e) => setLessonForm({ ...lessonForm, moduleId: e.target.value })}>
-                <option value="">Выберите модуль</option>
-                {course?.modules?.map((module) => <option key={module.id} value={module.id}>{module.title}</option>)}
-              </select>
-              <input placeholder="Название" value={lessonForm.Title} onChange={(e) => setLessonForm({ ...lessonForm, Title: e.target.value })} />
-              <textarea placeholder="Описание" value={lessonForm.Description} onChange={(e) => setLessonForm({ ...lessonForm, Description: e.target.value })} />
-              <input placeholder="Тип контента" value={lessonForm.Content_Type} onChange={(e) => setLessonForm({ ...lessonForm, Content_Type: e.target.value })} />
-              <input placeholder="URL материала" value={lessonForm.Content_Url} onChange={(e) => setLessonForm({ ...lessonForm, Content_Url: e.target.value })} />
-              <button className="button"><Plus size={18} /> Добавить урок</button>
-            </form>
+            <AdminSection id="lessons" title="Уроки" open={openAdminSections.lessons} onToggle={toggleAdminSection}>
+              <form className="mini-form" onSubmit={createLesson}>
+                <h2>Добавить урок</h2>
+                <select value={lessonForm.moduleId} onChange={(e) => setLessonForm({ ...lessonForm, moduleId: e.target.value })}>
+                  <option value="">Выберите модуль</option>
+                  {course?.modules?.map((module) => <option key={module.id} value={module.id}>{module.title}</option>)}
+                </select>
+                <input placeholder="Название" value={lessonForm.Title} onChange={(e) => setLessonForm({ ...lessonForm, Title: e.target.value })} />
+                <textarea placeholder="Описание" value={lessonForm.Description} onChange={(e) => setLessonForm({ ...lessonForm, Description: e.target.value })} />
+                <input placeholder="Тип контента" value={lessonForm.Content_Type} onChange={(e) => setLessonForm({ ...lessonForm, Content_Type: e.target.value })} />
+                <input placeholder="URL материала" value={lessonForm.Content_Url} onChange={(e) => setLessonForm({ ...lessonForm, Content_Url: e.target.value })} />
+                <button className="button admin-action"><Plus size={18} /> Добавить урок</button>
+              </form>
+            </AdminSection>
 
-            <form className="mini-form" onSubmit={createAssignment}>
-              <h2>Добавить задание</h2>
-              <select value={assignmentForm.lessonId} onChange={(e) => setAssignmentForm({ ...assignmentForm, lessonId: e.target.value })}>
-                <option value="">Выберите урок</option>
-                {lessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.moduleTitle}: {lesson.title}</option>)}
-              </select>
-              <input placeholder="Тип" value={assignmentForm.Type} onChange={(e) => setAssignmentForm({ ...assignmentForm, Type: e.target.value })} />
-              <textarea placeholder="Вопрос" value={assignmentForm.Question} onChange={(e) => setAssignmentForm({ ...assignmentForm, Question: e.target.value })} />
-              <input placeholder="Правильный ответ" value={assignmentForm.Correct_Answer} onChange={(e) => setAssignmentForm({ ...assignmentForm, Correct_Answer: e.target.value })} />
-              <button className="button"><Plus size={18} /> Добавить задание</button>
-            </form>
+            <AdminSection id="assignments" title="Задания" open={openAdminSections.assignments} onToggle={toggleAdminSection}>
+              <form className="mini-form" onSubmit={createAssignment}>
+                <h2>Добавить задание</h2>
+                <select value={assignmentForm.lessonId} onChange={(e) => setAssignmentForm({ ...assignmentForm, lessonId: e.target.value })}>
+                  <option value="">Выберите урок</option>
+                  {lessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.moduleTitle}: {lesson.title}</option>)}
+                </select>
+                <input placeholder="Тип" value={assignmentForm.Type} onChange={(e) => setAssignmentForm({ ...assignmentForm, Type: e.target.value })} />
+                <textarea placeholder="Вопрос" value={assignmentForm.Question} onChange={(e) => setAssignmentForm({ ...assignmentForm, Question: e.target.value })} />
+                <input placeholder="Правильный ответ" value={assignmentForm.Correct_Answer} onChange={(e) => setAssignmentForm({ ...assignmentForm, Correct_Answer: e.target.value })} />
+                <button className="button admin-action"><Plus size={18} /> Добавить задание</button>
+              </form>
+            </AdminSection>
 
-            <form className="mini-form" onSubmit={createResource}>
-              <h2>Добавить ресурс</h2>
-              <select value={resourceForm.lessonId} onChange={(e) => setResourceForm({ ...resourceForm, lessonId: e.target.value })}>
-                <option value="">Выберите урок</option>
-                {lessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.moduleTitle}: {lesson.title}</option>)}
-              </select>
-              <input placeholder="Название файла" value={resourceForm.File_Name} onChange={(e) => setResourceForm({ ...resourceForm, File_Name: e.target.value })} />
-              <input placeholder="URL" value={resourceForm.File_Url} onChange={(e) => setResourceForm({ ...resourceForm, File_Url: e.target.value })} />
-              <button className="button"><Plus size={18} /> Добавить ресурс</button>
-            </form>
+            <AdminSection id="resources" title="Ресурсы" open={openAdminSections.resources} onToggle={toggleAdminSection}>
+              <form className="mini-form" onSubmit={createResource}>
+                <h2>Добавить ресурс</h2>
+                <select value={resourceForm.lessonId} onChange={(e) => setResourceForm({ ...resourceForm, lessonId: e.target.value })}>
+                  <option value="">Выберите урок</option>
+                  {lessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.moduleTitle}: {lesson.title}</option>)}
+                </select>
+                <input placeholder="Название файла" value={resourceForm.File_Name} onChange={(e) => setResourceForm({ ...resourceForm, File_Name: e.target.value })} />
+                <input placeholder="URL" value={resourceForm.File_Url} onChange={(e) => setResourceForm({ ...resourceForm, File_Url: e.target.value })} />
+                <button className="button admin-action"><Plus size={18} /> Добавить ресурс</button>
+              </form>
+            </AdminSection>
           </section>
 
-          <section className="course-editor">
-            <h2>Структура курса</h2>
-            {!course?.modules?.length && <EmptyState title="Модулей пока нет" text="Добавьте первый модуль через форму выше." />}
-            {course?.modules?.map((module) => (
-              <article className="editor-module" key={module.id}>
+          <AdminSection id="structure" title="Структура курса" open={openAdminSections.structure} onToggle={toggleAdminSection}>
+            <section className="course-editor">
+              <h2>Структура курса</h2>
+              {!course?.modules?.length && <EmptyState title="Модулей пока нет" text="Добавьте первый модуль через форму выше." />}
+              {course?.modules?.map((module) => (
+                <article className="editor-module" key={module.id}>
                 <div className="editor-row editor-row--module">
                   <Field label="Тема модуля">
                     <input value={module.title || ""} onChange={(e) => updateModuleState(module.id, { title: e.target.value })} />
@@ -381,9 +427,10 @@ export default function AdminCourseForm() {
                     </div>
                   </div>
                 ))}
-              </article>
-            ))}
-          </section>
+                </article>
+              ))}
+            </section>
+          </AdminSection>
         </>
       )}
     </main>

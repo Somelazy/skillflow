@@ -106,6 +106,7 @@ export default function LessonMaterial({ lesson }) {
   const materialType = String(lesson?.contentType || "").toLowerCase();
   const isVideoLesson = materialType.includes("video");
   const materialKind = useMemo(() => getMaterialKind(contentUrl), [contentUrl]);
+  const isInlineMaterial = ["markdown", "html"].includes(materialKind);
   const [viewerState, setViewerState] = useState({
     loading: false,
     error: "",
@@ -115,7 +116,7 @@ export default function LessonMaterial({ lesson }) {
   useEffect(() => {
     let isMounted = true;
 
-    if (!contentUrl || !["markdown", "html"].includes(materialKind)) {
+    if (!contentUrl || !isInlineMaterial) {
       setViewerState({ loading: false, error: "", content: "" });
       return () => {
         isMounted = false;
@@ -145,9 +146,22 @@ export default function LessonMaterial({ lesson }) {
     return () => {
       isMounted = false;
     };
-  }, [contentUrl, materialKind]);
+  }, [contentUrl, isInlineMaterial]);
 
   const materialTitle = isVideoLesson ? "Видео-материал" : materialKind === "markdown" ? "Markdown-материал" : "Учебный материал";
+  const htmlPreview = useMemo(
+    () => `
+      <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 24px; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.65; color: #182235; }
+        img, video, iframe { max-width: 100%; }
+        pre { max-width: 100%; overflow-x: auto; padding: 16px; border-radius: 8px; background: #0f172a; color: #e2e8f0; }
+        code { overflow-wrap: anywhere; }
+      </style>
+      ${viewerState.content}
+    `,
+    [viewerState.content]
+  );
 
   return (
     <section className={`lesson-material ${isVideoLesson ? "lesson-material--video" : ""}`}>
@@ -169,14 +183,21 @@ export default function LessonMaterial({ lesson }) {
         {contentUrl ? (
           <a className="button" href={contentUrl} target="_blank" rel="noreferrer">
             {isVideoLesson ? <PlayCircle size={18} /> : <ExternalLink size={18} />}
-            {isVideoLesson ? "Смотреть материал" : "Открыть в новой вкладке"}
+            {isVideoLesson ? "Смотреть материал" : "Открыть материал"}
           </a>
         ) : (
-          <span className="lesson-material__empty">Ссылка на материал пока не добавлена.</span>
+          <div className="lesson-material__empty">
+            <FileText size={20} />
+            <span>Материал урока пока не добавлен.</span>
+          </div>
+        )}
+
+        {contentUrl && !isInlineMaterial && (
+          <span className="lesson-material__url">{contentUrl}</span>
         )}
       </div>
 
-      {contentUrl && ["markdown", "html"].includes(materialKind) ? (
+      {contentUrl && isInlineMaterial ? (
         <div className="material-viewer">
           {viewerState.loading ? (
             <div className="material-viewer__loading">
@@ -196,7 +217,7 @@ export default function LessonMaterial({ lesson }) {
               className="material-viewer__frame"
               title={`Материал урока: ${lesson?.title || "урок"}`}
               sandbox=""
-              srcDoc={viewerState.content}
+              srcDoc={htmlPreview}
             />
           ) : (
             <div

@@ -15,10 +15,11 @@ export default function LessonAssignments({ assignments = [] }) {
             <article className="assignment" key={assignment.id}>
               <div className="assignment__meta">
                 <ClipboardList size={20} />
-                <strong>{assignment.type}</strong>
+                <strong>{assignment.type || "Задание"}</strong>
                 {assignment.maxScore ? <span>{assignment.maxScore} баллов</span> : null}
               </div>
-              <p>{assignment.question}</p>
+              <p>{assignment.question || "Описание задания пока не добавлено."}</p>
+              <small className="assignment__status">Пока без отправки ответа</small>
             </article>
           ))}
         </div>

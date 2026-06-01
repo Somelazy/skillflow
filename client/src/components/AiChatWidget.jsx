@@ -272,6 +272,11 @@ export default function AiChatWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isLoading, isOpen]);
 
+  useEffect(() => {
+    document.body.classList.toggle("ai-chat-mobile-open", isOpen && isCompactChat);
+    return () => document.body.classList.remove("ai-chat-mobile-open");
+  }, [isOpen, isCompactChat]);
+
   const appendAssistantError = (error, sourceText) => {
     setMessages((current) => [
       ...current,

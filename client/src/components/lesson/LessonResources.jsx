@@ -17,10 +17,11 @@ export default function LessonResources({ resources = [] }) {
                 {resource.fileType === "link" ? <LinkIcon size={22} /> : <FileText size={22} />}
               </div>
               <div>
-                <h3>{resource.fileName}</h3>
-                <p>{resource.fileType || "Материал"} к этому уроку</p>
+                <h3>{resource.fileName || "Материал урока"}</h3>
+                <p>{resource.description || `${resource.fileType || "Материал"} к этому уроку`}</p>
+                {resource.fileUrl && <small>{resource.fileUrl}</small>}
               </div>
-              <a href={resource.fileUrl} target="_blank" rel="noreferrer">
+              <a className="resource-card__action" href={resource.fileUrl} target="_blank" rel="noreferrer">
                 Открыть
               </a>
             </article>

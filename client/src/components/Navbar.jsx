@@ -10,6 +10,7 @@ export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const userInitial = (user?.firstName || user?.login || user?.email || "S").slice(0, 1).toUpperCase();
+  const navLinkClass = ({ isActive }) => (isActive ? "nav-link active" : "nav-link");
 
   return (
     <header className="navbar">
@@ -21,10 +22,10 @@ export default function Navbar() {
         {isOpen ? <X size={22} /> : <Menu size={22} />}
       </button>
       <nav className={isOpen ? "navbar__nav navbar__nav--open" : "navbar__nav"}>
-        <NavLink to="/courses">Курсы</NavLink>
-        {user && <NavLink to="/dashboard">Кабинет</NavLink>}
-        {user && <NavLink to="/my-courses">Мои курсы</NavLink>}
-        {isAdmin && <NavLink to="/admin/courses"><Shield size={16} /> Админ</NavLink>}
+        <NavLink className={navLinkClass} to="/courses">Курсы</NavLink>
+        {user && <NavLink className={navLinkClass} to="/dashboard">Кабинет</NavLink>}
+        {user && <NavLink className={navLinkClass} to="/my-courses">Мои курсы</NavLink>}
+        {isAdmin && <NavLink className={navLinkClass} to="/admin/courses"><Shield size={16} /> Админ</NavLink>}
       </nav>
       <div className="navbar__actions">
         <button className="theme-toggle" onClick={toggleTheme} aria-label="Переключить тему" title="Переключить тему">
