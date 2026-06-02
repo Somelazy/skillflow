@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, NavLink } from "react-router-dom";
-import { GraduationCap, LogOut, Menu, Moon, Shield, Sun, X } from "lucide-react";
+import { LogOut, Menu, Moon, Shield, Sun, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useState } from "react";
@@ -14,9 +14,9 @@ export default function Navbar() {
 
   return (
     <header className="navbar">
-      <Link className="brand" to="/">
-        <GraduationCap size={26} />
-        <span>SkillFlow</span>
+      <Link className="brand brand-logo" to="/" aria-label="SkillFlow — главная">
+        <img className="brand-logo__image brand-logo__image--nav" src="/logo.png" alt="SkillFlow logo" />
+        <span className="brand-logo__text">SkillFlow</span>
       </Link>
       <button className="navbar__menu" onClick={() => setIsOpen((value) => !value)} title="Меню">
         {isOpen ? <X size={22} /> : <Menu size={22} />}
